@@ -185,7 +185,17 @@ export function edgeCache() {
       if (!storeEligible(res)) return;
       const copy = cachedCopy(res.clone(), ttl, filePrefix);
       c.res = withState(res, 'MISS');
-      wait(b.put(key, copy), maybeCtx(c));
+
+      // Cloudflare Worker 中交给 waitUntil；裸 app.request() 测试中等待写入，
+      // 确保下一次请求能读取到刚写入的缓存。
+      const write = b.put(key, copy);
+      const ctx = maybeCtx(c);
+      if (ctx?.waitUntil) {
+      ctx.waitUntil(write.catch(() => undefined));
+      } else {
+      await write.catch(() => undefined);
+}
+
     },
   );
 }
